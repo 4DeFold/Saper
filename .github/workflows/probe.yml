@@ -1,6 +1,7 @@
 name: env-probe
 on:
-  workflow_dispatch:
+  push:
+    branches: [arena/05343003-saper]
 jobs:
   linux:
     runs-on: ubuntu-latest
