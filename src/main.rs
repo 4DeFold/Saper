@@ -380,9 +380,9 @@ fn compute_layout(zoom: f32, cols: usize, sw: f32, sh: f32) -> Layout {
     let panel_w = (sw - 2.0 * margin).clamp(160.0, 980.0).min(sw);
     let panel_x = (sw - panel_w) / 2.0;
     let cell = (28.0 * zoom).clamp(CELL_MIN, CELL_MAX);
-    let header_y = 18.0;
-    let toolbar_y = 96.0;
-    let toolbar_h = 30.0;
+    let header_y: f32 = 18.0;
+    let toolbar_y: f32 = 96.0;
+    let toolbar_h: f32 = 30.0;
     let board_y = (toolbar_y + toolbar_h + 22.0).min((sh - 80.0).max(40.0));
     let wanted_h = (sh - board_y - 52.0).max(60.0);
     let available_h = (sh - board_y - 8.0).max(20.0);
@@ -1323,7 +1323,12 @@ mod layout_tests {
 
     #[test]
     fn centered_panel_and_board_fit_small_and_large_windows() {
-        let sizes = [(360.0, 240.0), (640.0, 400.0), (1120.0, 780.0), (1920.0, 1080.0)];
+        let sizes = [
+            (360.0, 240.0),
+            (640.0, 400.0),
+            (1120.0, 780.0),
+            (1920.0, 1080.0),
+        ];
         for (sw, sh) in sizes {
             let l = compute_layout(1.0, 10, sw, sh);
             assert!(l.panel_x >= 0.0);
