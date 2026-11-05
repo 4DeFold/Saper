@@ -171,7 +171,9 @@ fn smoke_options() -> Smoke {
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--smoke" => smoke.frames = args.next().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0),
+            "--smoke" => {
+                smoke.frames = args.next().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0)
+            }
             "--headless" => smoke.headless = true,
             "--marker" => smoke.marker = args.next(),
             _ => {}
@@ -186,7 +188,10 @@ fn smoke_options() -> Smoke {
 fn run_headless(smoke: &Smoke) {
     let exe = std::env::current_exe().unwrap_or_default();
     let exe_display = exe.display();
-    let contents = exe.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf());
+    let contents = exe
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf());
     let mut lines = vec![format!("exe={exe_display}")];
     let mut ok = true;
     match &contents {
@@ -228,10 +233,8 @@ fn run_headless(smoke: &Smoke) {
     let normal_event = normal.open(4, 4);
     let limits_ok = Config::new(5, 5, 0) == Config::new(10, 10, 1)
         && Config::new(200, 100, 25_000).mines == 19_999;
-    let normal_ok = normal.flags() == 0
-        && normal.cell(4, 4).open
-        && normal_event == Event::Open
-        && limits_ok;
+    let normal_ok =
+        normal.flags() == 0 && normal.cell(4, 4).open && normal_event == Event::Open && limits_ok;
     lines.push(format!("logic + limits: {normal_ok}"));
     ok &= normal_ok;
 
