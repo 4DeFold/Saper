@@ -295,7 +295,7 @@ fn frame(app: &mut App) {
 
 fn compute_layout(app: &App, sw: f32, sh: f32) -> Layout {
     let margin = 16.0;
-    let panel_w = (sw - 2.0 * margin).min(980.0).max(160.0).min(sw);
+    let panel_w = (sw - 2.0 * margin).clamp(160.0, 980.0).min(sw);
     let panel_x = (sw - panel_w) / 2.0;
     let cell = (28.0 * app.zoom).clamp(CELL_MIN, CELL_MAX);
     let header_y = 18.0;
@@ -364,9 +364,30 @@ fn bevel(x: f32, y: f32, w: f32, h: f32, pressed: bool) {
     } else {
         draw_line(x, y, x + w, y, 3.0, WHITE);
         draw_line(x, y, x, y + h, 3.0, WHITE);
-        draw_line(x, y + h, x + w, y + h, 3.0, Color::new(0.35, 0.35, 0.35, 1.0));
-        draw_line(x + w, y, x + w, y + h, 3.0, Color::new(0.35, 0.35, 0.35, 1.0));
-        draw_line(x + 2.0, y + h - 2.0, x + w - 2.0, y + h - 2.0, 1.0, Color::new(0.54, 0.54, 0.54, 1.0));
+        draw_line(
+            x,
+            y + h,
+            x + w,
+            y + h,
+            3.0,
+            Color::new(0.35, 0.35, 0.35, 1.0),
+        );
+        draw_line(
+            x + w,
+            y,
+            x + w,
+            y + h,
+            3.0,
+            Color::new(0.35, 0.35, 0.35, 1.0),
+        );
+        draw_line(
+            x + 2.0,
+            y + h - 2.0,
+            x + w - 2.0,
+            y + h - 2.0,
+            1.0,
+            Color::new(0.54, 0.54, 0.54, 1.0),
+        );
     }
 }
 
@@ -389,15 +410,36 @@ fn mine_icon(x: f32, y: f32, size: f32) {
     draw_circle(x, y, r, BLACK);
     for a in 0..8 {
         let t = a as f32 * std::f32::consts::PI / 4.0;
-        draw_line(x + t.cos() * r * 0.75, y + t.sin() * r * 0.75, x + t.cos() * r * 1.65, y + t.sin() * r * 1.65, size * 0.075, BLACK);
+        draw_line(
+            x + t.cos() * r * 0.75,
+            y + t.sin() * r * 0.75,
+            x + t.cos() * r * 1.65,
+            y + t.sin() * r * 1.65,
+            size * 0.075,
+            BLACK,
+        );
     }
     draw_circle(x - r * 0.28, y - r * 0.30, r * 0.18, WHITE);
 }
 
 fn flag_icon(x: f32, y: f32, size: f32) {
     let u = size / 24.0;
-    draw_line(x + 5.0 * u, y + 21.0 * u, x + 18.0 * u, y + 21.0 * u, 2.0 * u, BLACK);
-    draw_line(x + 11.0 * u, y + 5.0 * u, x + 11.0 * u, y + 20.0 * u, 2.0 * u, BLACK);
+    draw_line(
+        x + 5.0 * u,
+        y + 21.0 * u,
+        x + 18.0 * u,
+        y + 21.0 * u,
+        2.0 * u,
+        BLACK,
+    );
+    draw_line(
+        x + 11.0 * u,
+        y + 5.0 * u,
+        x + 11.0 * u,
+        y + 20.0 * u,
+        2.0 * u,
+        BLACK,
+    );
     draw_triangle(
         vec2(x + 11.0 * u, y + 5.0 * u),
         vec2(x + 11.0 * u, y + 15.0 * u),
@@ -487,8 +529,22 @@ fn draw_panel(sw: f32, sh: f32, px: f32, pw: f32) {
     draw_rectangle(px, 10.0, pw, sh - 20.0, FACE);
     draw_line(px, 10.0, px + pw, 10.0, 3.0, WHITE);
     draw_line(px, 10.0, px, sh - 10.0, 3.0, WHITE);
-    draw_line(px, sh - 10.0, px + pw, sh - 10.0, 3.0, Color::new(0.3, 0.3, 0.3, 1.0));
-    draw_line(px + pw, 10.0, px + pw, sh - 10.0, 3.0, Color::new(0.3, 0.3, 0.3, 1.0));
+    draw_line(
+        px,
+        sh - 10.0,
+        px + pw,
+        sh - 10.0,
+        3.0,
+        Color::new(0.3, 0.3, 0.3, 1.0),
+    );
+    draw_line(
+        px + pw,
+        10.0,
+        px + pw,
+        sh - 10.0,
+        3.0,
+        Color::new(0.3, 0.3, 0.3, 1.0),
+    );
 }
 
 fn preset_label(preset: Preset) -> &'static str {
@@ -607,7 +663,7 @@ fn toolbar_geometry(l: &Layout) -> (f32, f32, f32, [f32; 6]) {
     let widths = [90.0, 30.0, 52.0, 30.0, 92.0, 112.0];
     let gap = 7.0;
     let total: f32 = widths.iter().sum::<f32>() + gap * 5.0;
-    let scale = ((l.panel_w - 24.0) / total).min(1.0).max(0.5);
+    let scale = ((l.panel_w - 24.0) / total).clamp(0.5, 1.0);
     let scaled: [f32; 6] = std::array::from_fn(|i| widths[i] * scale);
     let total_scaled: f32 = scaled.iter().sum::<f32>() + gap * scale * 5.0;
     let start = l.panel_x + (l.panel_w - total_scaled) / 2.0;
@@ -686,7 +742,14 @@ fn draw_board(app: &App, l: &Layout) {
             let cell = app.game.cell(x, y);
             if cell.open {
                 draw_rectangle(cx0, cy0, dw, dh, OPEN_BG);
-                draw_line(cx0, cy0 + dh, cx1, cy0 + dh, 1.0, Color::new(0.46, 0.46, 0.46, 1.0));
+                draw_line(
+                    cx0,
+                    cy0 + dh,
+                    cx1,
+                    cy0 + dh,
+                    1.0,
+                    Color::new(0.46, 0.46, 0.46, 1.0),
+                );
                 draw_line(cx1, cy0, cx1, cy1, 1.0, Color::new(0.46, 0.46, 0.46, 1.0));
             } else {
                 bevel(cx0, cy0, dw, dh, false);
@@ -925,7 +988,7 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
         bevel(xx, yy, pw, hh, app.preset == *preset);
         centered(
             &font,
-            *label,
+            label,
             xx + pw / 2.0,
             yy + d.w(22.0),
             d.fs(10.0),
@@ -986,7 +1049,7 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
     ];
     for (i, (name, edit, key)) in rows.iter().enumerate() {
         let yy = 352.0 + i as f32 * 38.0;
-        text(&font, *name, d.x(32.0), d.y(yy + 20.0), d.fs(12.0), BLACK);
+        text(&font, name, d.x(32.0), d.y(yy + 20.0), d.fs(12.0), BLACK);
         let xx = d.x(Dialog::W - 114.0);
         let bw = d.w(82.0);
         let bh = d.w(28.0);
@@ -1105,7 +1168,7 @@ fn field_row(app: &mut App, d: &Dialog, label: &str, row_y: f32, edit: Edit, mx:
         bevel(xx, d.y(row_y), bw, field_h, false);
         centered(
             &font,
-            *label,
+            label,
             xx + bw / 2.0,
             d.y(row_y) + d.w(21.0),
             d.fs(17.0),
