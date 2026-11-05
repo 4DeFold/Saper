@@ -27,6 +27,30 @@ jobs:
       - name: Rust checks
         run: ./scripts/ci-checks.sh
 
+      - name: GUI smoke через Xvfb (software OpenGL)
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          {
+            echo ""
+            echo "===== LINUX GUI SMOKE (Xvfb) ====="
+          } >> ci-report.txt
+          sudo apt-get install -y --no-install-recommends xvfb libgl1-mesa-dri >> ci-report.txt 2>&1
+          MARKER="$RUNNER_TEMP/linux-gui-smoke.txt"
+          rm -f "$MARKER"
+          timeout 90s xvfb-run -a -s "-screen 0 1280x800x24" \
+            ./target/release/classic-minesweeper --smoke 30 --marker "$MARKER" \
+            >> ci-report.txt 2>&1
+          RC=$?
+          echo "exit=$RC" >> ci-report.txt
+          if [[ -f "$MARKER" ]]; then
+            cat "$MARKER" | tee -a ci-report.txt
+            echo "==> GUI отрисовал кадры под Xvfb" | tee -a ci-report.txt
+          else
+            echo "==> GUI smoke под Xvfb не подтверждён (см. вывод выше)" | tee -a ci-report.txt
+          fi
+          exit "$RC"
+
       - name: Опубликовать отчёт комментарием к коммиту
         if: always()
         env:
