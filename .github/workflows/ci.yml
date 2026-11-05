@@ -1,0 +1,147 @@
+name: CI — Rust checks and Apple Silicon DMG
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  checks:
+    name: Rust checks (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Rust checks
+        run: ./scripts/ci-checks.sh
+
+      - name: Опубликовать отчёт комментарием к коммиту
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! -f ci-report.txt ]]; then exit 0; fi
+          head -c 60000 ci-report.txt > /tmp/report.md
+          jq -n --rawfile body /tmp/report.md '{body: $body}' > /tmp/comment.json
+          gh api -X POST "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            --input /tmp/comment.json || true
+          if grep -q RUSTFMT_PATCH_BEGIN ci-report.txt; then
+            awk '/===== RUSTFMT_PATCH_BEGIN =====/{f=1;next} /===== RUSTFMT_PATCH_END =====/{f=0} f' \
+              ci-report.txt > /tmp/fmt.patch
+            jq -n --rawfile body /tmp/fmt.patch '{body: ("RUSTFMT PATCH\n\n" + $body)}' > /tmp/fmt.json
+            gh api -X POST "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+              --input /tmp/fmt.json || true
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-checks-report
+          path: ci-report.txt
+          if-no-files-found: ignore
+
+  macos-arm:
+    name: macOS ARM64 .app + DMG
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Подтвердить ARM-архитектуру раннера
+        run: |
+          echo "uname -m: $(uname -m)" | tee ci-macos-report.txt
+          echo "rustc host: $(rustc -vV | sed -n 's/^host: //p')" | tee -a ci-macos-report.txt
+          test "$(uname -m)" = "arm64"
+          test "$(rustc -vV | sed -n 's/^host: //p')" = "aarch64-apple-darwin"
+          sw_vers | tee -a ci-macos-report.txt
+
+      - name: Тесты игровой логики на ARM
+        run: cargo test -p minesweeper-core 2>&1 | tee -a ci-macos-report.txt
+
+      - name: Сборка .app и .dmg
+        run: |
+          set -o pipefail
+          ./build-dmg.sh 2>&1 | tee -a ci-macos-report.txt
+
+      - name: Проверка структуры .app и архитектуры
+        run: |
+          set -euo pipefail
+          APP="build/Classic Minesweeper.app"
+          {
+            echo "===== .app tree ====="
+            find "$APP" -maxdepth 3 -print
+            echo "===== plutil ====="
+            plutil -lint "$APP/Contents/Info.plist"
+            echo "===== lipo -archs ====="
+            lipo -archs "$APP/Contents/MacOS/classic-minesweeper"
+            echo "===== file ====="
+            file "$APP/Contents/MacOS/classic-minesweeper"
+            echo "===== codesign ====="
+            codesign -dv --verbose=2 "$APP" 2>&1 || true
+            echo "===== DMG ====="
+            ls -lh dist/
+            shasum -a 256 dist/Classic-Minesweeper-Apple-Silicon.dmg
+          } >> ci-macos-report.txt 2>&1
+
+      - name: Smoke-запуск именно .app
+        run: |
+          set -euo pipefail
+          APP="$PWD/build/Classic Minesweeper.app"
+          MARKER="$RUNNER_TEMP/minesweeper-smoke.txt"
+          rm -f "$MARKER"
+          echo "===== open -a (LaunchServices) =====" >> ci-macos-report.txt
+          open -n -a "$APP" --args --smoke 45 --marker "$MARKER"
+          for _ in $(seq 1 45); do
+            if [[ -f "$MARKER" ]]; then break; fi
+            sleep 1
+          done
+          if [[ ! -f "$MARKER" ]]; then
+            echo "SMOKE FAIL: маркер не появился за 45 с" | tee -a ci-macos-report.txt
+            exit 1
+          fi
+          cat "$MARKER" | tee -a ci-macos-report.txt
+          echo "===== processes =====" >> ci-macos-report.txt
+          pgrep -fl "Classic Minesweeper" >> ci-macos-report.txt || true
+
+      - name: Опубликовать отчёт комментарием к коммиту
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! -f ci-macos-report.txt ]]; then exit 0; fi
+          head -c 60000 ci-macos-report.txt > /tmp/report.md
+          jq -n --rawfile body /tmp/report.md '{body: ("MACOS ARM REPORT\n\n" + $body)}' > /tmp/comment.json
+          gh api -X POST "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" \
+            --input /tmp/comment.json || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Classic-Minesweeper-Apple-Silicon
+          path: dist/Classic-Minesweeper-Apple-Silicon.dmg
+          if-no-files-found: ignore
+
+      - name: Приложить DMG к GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DMG="dist/Classic-Minesweeper-Apple-Silicon.dmg"
+          test -f "$DMG"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$DMG" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$DMG" \
+              --title "Classic Minesweeper $GITHUB_REF_NAME (Apple Silicon)" \
+              --generate-notes
+          fi
+          echo "==> Release: https://github.com/${{ github.repository }}/releases/tag/$GITHUB_REF_NAME"
