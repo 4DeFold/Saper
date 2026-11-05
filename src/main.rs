@@ -201,7 +201,7 @@ async fn main() {
             if drawn >= smoke.frames {
                 let message = format!("SMOKE OK: frames={drawn}\n");
                 if let Some(path) = &smoke.marker {
-                    let _ = std::fs::write(path, &message);
+                    let _ = std::fs::write(path, message.as_bytes());
                 }
                 println!("{message}");
                 std::process::exit(0);
@@ -259,7 +259,7 @@ fn frame(app: &mut App) {
     let sw = screen_width();
     let sh = screen_height();
     let (mx, my) = mouse_position();
-    let layout = layout(app, sw, sh);
+    let layout = compute_layout(app, sw, sh);
 
     draw_panel(sw, sh, layout.panel_x, layout.panel_w);
     draw_header(app, &layout);
@@ -283,16 +283,17 @@ fn frame(app: &mut App) {
         app.settings = false;
         app.close_edit();
     }
-    if is_mouse_button_released(MouseButton::Left) || is_mouse_button_released(MouseButton::Middle) {
+    if is_mouse_button_released(MouseButton::Left) || is_mouse_button_released(MouseButton::Middle)
+    {
         app.smile_down = false;
         app.dragging = false;
     }
 
-    let updated = layout(app, sw, sh);
+    let updated = compute_layout(app, sw, sh);
     clamp_cam(app, &updated);
 }
 
-fn layout(app: &App, sw: f32, sh: f32) -> Layout {
+fn compute_layout(app: &App, sw: f32, sh: f32) -> Layout {
     let margin = 16.0;
     let panel_w = (sw - 2.0 * margin).min(980.0).max(160.0).min(sw);
     let panel_x = (sw - panel_w) / 2.0;
@@ -356,25 +357,25 @@ fn centered(font: &Font, s: &str, x: f32, y: f32, size: f32, color: Color) {
 fn bevel(x: f32, y: f32, w: f32, h: f32, pressed: bool) {
     draw_rectangle(x, y, w, h, FACE);
     if pressed {
-        draw_line(x, y, x + w, y, GRAY, 2.0);
-        draw_line(x, y, x, y + h, GRAY, 2.0);
-        draw_line(x, y + h, x + w, y + h, DARKGRAY, 2.0);
-        draw_line(x + w, y, x + w, y + h, DARKGRAY, 2.0);
+        draw_line(x, y, x + w, y, 2.0, GRAY);
+        draw_line(x, y, x, y + h, 2.0, GRAY);
+        draw_line(x, y + h, x + w, y + h, 2.0, DARKGRAY);
+        draw_line(x + w, y, x + w, y + h, 2.0, DARKGRAY);
     } else {
-        draw_line(x, y, x + w, y, WHITE, 3.0);
-        draw_line(x, y, x, y + h, WHITE, 3.0);
-        draw_line(x, y + h, x + w, y + h, Color::new(0.35, 0.35, 0.35, 1.0), 3.0);
-        draw_line(x + w, y, x + w, y + h, Color::new(0.35, 0.35, 0.35, 1.0), 3.0);
-        draw_line(x + 2.0, y + h - 2.0, x + w - 2.0, y + h - 2.0, Color::new(0.54, 0.54, 0.54, 1.0), 1.0);
+        draw_line(x, y, x + w, y, 3.0, WHITE);
+        draw_line(x, y, x, y + h, 3.0, WHITE);
+        draw_line(x, y + h, x + w, y + h, 3.0, Color::new(0.35, 0.35, 0.35, 1.0));
+        draw_line(x + w, y, x + w, y + h, 3.0, Color::new(0.35, 0.35, 0.35, 1.0));
+        draw_line(x + 2.0, y + h - 2.0, x + w - 2.0, y + h - 2.0, 1.0, Color::new(0.54, 0.54, 0.54, 1.0));
     }
 }
 
 fn inset(x: f32, y: f32, w: f32, h: f32) {
     draw_rectangle(x, y, w, h, Color::new(0.47, 0.47, 0.47, 1.0));
-    draw_line(x, y, x + w, y, Color::new(0.28, 0.28, 0.28, 1.0), 2.0);
-    draw_line(x, y, x, y + h, Color::new(0.28, 0.28, 0.28, 1.0), 2.0);
-    draw_line(x, y + h, x + w, y + h, WHITE, 2.0);
-    draw_line(x + w, y, x + w, y + h, WHITE, 2.0);
+    draw_line(x, y, x + w, y, 2.0, Color::new(0.28, 0.28, 0.28, 1.0));
+    draw_line(x, y, x, y + h, 2.0, Color::new(0.28, 0.28, 0.28, 1.0));
+    draw_line(x, y + h, x + w, y + h, 2.0, WHITE);
+    draw_line(x + w, y, x + w, y + h, 2.0, WHITE);
 }
 
 fn polyline(points: &[(f32, f32)], thickness: f32, color: Color) {
@@ -388,22 +389,15 @@ fn mine_icon(x: f32, y: f32, size: f32) {
     draw_circle(x, y, r, BLACK);
     for a in 0..8 {
         let t = a as f32 * std::f32::consts::PI / 4.0;
-        draw_line(
-            x + t.cos() * r * 0.75,
-            y + t.sin() * r * 0.75,
-            x + t.cos() * r * 1.65,
-            y + t.sin() * r * 1.65,
-            BLACK,
-            size * 0.075,
-        );
+        draw_line(x + t.cos() * r * 0.75, y + t.sin() * r * 0.75, x + t.cos() * r * 1.65, y + t.sin() * r * 1.65, size * 0.075, BLACK);
     }
     draw_circle(x - r * 0.28, y - r * 0.30, r * 0.18, WHITE);
 }
 
 fn flag_icon(x: f32, y: f32, size: f32) {
     let u = size / 24.0;
-    draw_line(x + 5.0 * u, y + 21.0 * u, x + 18.0 * u, y + 21.0 * u, BLACK, 2.0 * u);
-    draw_line(x + 11.0 * u, y + 5.0 * u, x + 11.0 * u, y + 20.0 * u, BLACK, 2.0 * u);
+    draw_line(x + 5.0 * u, y + 21.0 * u, x + 18.0 * u, y + 21.0 * u, 2.0 * u, BLACK);
+    draw_line(x + 11.0 * u, y + 5.0 * u, x + 11.0 * u, y + 20.0 * u, 2.0 * u, BLACK);
     draw_triangle(
         vec2(x + 11.0 * u, y + 5.0 * u),
         vec2(x + 11.0 * u, y + 15.0 * u),
@@ -434,13 +428,26 @@ fn draw_digit(font: &Font, x: f32, y: f32, size: f32, value: i32) {
     };
     for (i, ch) in shown.chars().enumerate() {
         let cx = x + i as f32 * size * 0.62;
-        draw_rectangle(cx, y, size * 0.58, size * 1.15, Color::new(0.22, 0.22, 0.22, 1.0));
+        draw_rectangle(
+            cx,
+            y,
+            size * 0.58,
+            size * 1.15,
+            Color::new(0.22, 0.22, 0.22, 1.0),
+        );
         let color = if ch == '-' {
             RED
         } else {
             Color::new(1.0, 0.12, 0.12, 1.0)
         };
-        text(font, &ch.to_string(), cx + 1.0, y + size * 0.93, size * 1.02, color);
+        text(
+            font,
+            &ch.to_string(),
+            cx + 1.0,
+            y + size * 0.93,
+            size * 1.02,
+            color,
+        );
     }
 }
 
@@ -478,10 +485,10 @@ fn draw_face(x: f32, y: f32, size: f32, phase: Phase) {
 fn draw_panel(sw: f32, sh: f32, px: f32, pw: f32) {
     let _ = sw;
     draw_rectangle(px, 10.0, pw, sh - 20.0, FACE);
-    draw_line(px, 10.0, px + pw, 10.0, WHITE, 3.0);
-    draw_line(px, 10.0, px, sh - 10.0, WHITE, 3.0);
-    draw_line(px, sh - 10.0, px + pw, sh - 10.0, Color::new(0.3, 0.3, 0.3, 1.0), 3.0);
-    draw_line(px + pw, 10.0, px + pw, sh - 10.0, Color::new(0.3, 0.3, 0.3, 1.0), 3.0);
+    draw_line(px, 10.0, px + pw, 10.0, 3.0, WHITE);
+    draw_line(px, 10.0, px, sh - 10.0, 3.0, WHITE);
+    draw_line(px, sh - 10.0, px + pw, sh - 10.0, 3.0, Color::new(0.3, 0.3, 0.3, 1.0));
+    draw_line(px + pw, 10.0, px + pw, sh - 10.0, 3.0, Color::new(0.3, 0.3, 0.3, 1.0));
 }
 
 fn preset_label(preset: Preset) -> &'static str {
@@ -506,7 +513,13 @@ fn draw_header(app: &App, l: &Layout) {
     let font = &app.font;
     let size = 22.0;
     let digits_w = size * 0.62 * 3.0;
-    draw_digit(font, l.panel_x + 18.0, l.header_y + 6.0, size, app.game.mine_counter());
+    draw_digit(
+        font,
+        l.panel_x + 18.0,
+        l.header_y + 6.0,
+        size,
+        app.game.mine_counter(),
+    );
     draw_digit(
         font,
         l.panel_x + l.panel_w - 18.0 - digits_w,
@@ -521,7 +534,14 @@ fn draw_header(app: &App, l: &Layout) {
     draw_face(fx + 3.0, fy + 3.0, face_size - 6.0, app.game.phase());
 
     mine_icon(l.panel_x + 30.0, l.header_y + 52.0, 26.0);
-    text(font, "САПЁР", l.panel_x + 46.0, l.header_y + 58.0, 15.0, BLACK);
+    text(
+        font,
+        "САПЁР",
+        l.panel_x + 46.0,
+        l.header_y + 58.0,
+        15.0,
+        BLACK,
+    );
     text(
         font,
         "CLASSIC",
@@ -599,7 +619,14 @@ fn draw_toolbar(app: &App, l: &Layout) {
     let labels = toolbar_items(app);
     for (label, w) in labels.iter().zip(widths.iter()) {
         bevel(x, l.toolbar_y, *w, h, false);
-        centered(&app.font, label, x + w / 2.0, l.toolbar_y + 19.0, 12.0, BLACK);
+        centered(
+            &app.font,
+            label,
+            x + w / 2.0,
+            l.toolbar_y + 19.0,
+            12.0,
+            BLACK,
+        );
         x += w + gap;
     }
 }
@@ -629,7 +656,12 @@ fn handle_toolbar_click(app: &mut App, l: &Layout, mx: f32, my: f32) {
 }
 
 fn draw_board(app: &App, l: &Layout) {
-    inset(l.board_x - 7.0, l.board_y - 7.0, l.board_w + 14.0, l.board_h + 14.0);
+    inset(
+        l.board_x - 7.0,
+        l.board_y - 7.0,
+        l.board_w + 14.0,
+        l.board_h + 14.0,
+    );
     draw_rectangle(l.board_x, l.board_y, l.board_w, l.board_h, BOARD_BG);
     let right = l.board_x + l.board_w;
     let bottom = l.board_y + l.board_h;
@@ -654,8 +686,8 @@ fn draw_board(app: &App, l: &Layout) {
             let cell = app.game.cell(x, y);
             if cell.open {
                 draw_rectangle(cx0, cy0, dw, dh, OPEN_BG);
-                draw_line(cx0, cy0 + dh, cx1, cy0 + dh, Color::new(0.46, 0.46, 0.46, 1.0), 1.0);
-                draw_line(cx1, cy0, cx1, cy1, Color::new(0.46, 0.46, 0.46, 1.0), 1.0);
+                draw_line(cx0, cy0 + dh, cx1, cy0 + dh, 1.0, Color::new(0.46, 0.46, 0.46, 1.0));
+                draw_line(cx1, cy0, cx1, cy1, 1.0, Color::new(0.46, 0.46, 0.46, 1.0));
             } else {
                 bevel(cx0, cy0, dw, dh, false);
             }
@@ -678,8 +710,22 @@ fn draw_board(app: &App, l: &Layout) {
             } else if cell.flag {
                 flag_icon(sx + l.cell * 0.12, sy + l.cell * 0.10, l.cell * 0.78);
                 if app.game.phase() == Phase::Lost && !cell.mine {
-                    draw_line(sx + 3.0, sy + 3.0, sx + l.cell - 3.0, sy + l.cell - 3.0, 2.0, RED);
-                    draw_line(sx + l.cell - 3.0, sy + 3.0, sx + 3.0, sy + l.cell - 3.0, 2.0, RED);
+                    draw_line(
+                        sx + 3.0,
+                        sy + 3.0,
+                        sx + l.cell - 3.0,
+                        sy + l.cell - 3.0,
+                        2.0,
+                        RED,
+                    );
+                    draw_line(
+                        sx + l.cell - 3.0,
+                        sy + 3.0,
+                        sx + 3.0,
+                        sy + l.cell - 3.0,
+                        2.0,
+                        RED,
+                    );
                 }
             } else if app.game.phase() == Phase::Lost && cell.mine {
                 mine_icon(sx + l.cell / 2.0, sy + l.cell / 2.0, l.cell * 0.76);
@@ -846,7 +892,14 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
     bevel(d.x(0.0), d.y(0.0), d.w(Dialog::W), d.w(Dialog::H), false);
     let font = app.font.clone();
     let dark = Color::new(0.18, 0.18, 0.18, 1.0);
-    centered(&font, "НАСТРОЙКИ ИГРЫ", d.x(Dialog::W / 2.0), d.y(38.0), d.fs(22.0), BLACK);
+    centered(
+        &font,
+        "НАСТРОЙКИ ИГРЫ",
+        d.x(Dialog::W / 2.0),
+        d.y(38.0),
+        d.fs(22.0),
+        BLACK,
+    );
     text(
         &font,
         "Классический вид, собственные ресурсы",
@@ -870,7 +923,14 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
         let yy = d.y(106.0);
         let hh = d.w(34.0);
         bevel(xx, yy, pw, hh, app.preset == *preset);
-        centered(&font, *label, xx + pw / 2.0, yy + d.w(22.0), d.fs(10.0), BLACK);
+        centered(
+            &font,
+            *label,
+            xx + pw / 2.0,
+            yy + d.w(22.0),
+            d.fs(10.0),
+            BLACK,
+        );
         if is_mouse_button_pressed(MouseButton::Left) && hit(mx, my, xx, yy, pw, hh) {
             app.preset = *preset;
             app.close_edit();
@@ -881,11 +941,26 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
         }
     }
 
-    text(&font, "РАЗМЕР ПОЛЯ", d.x(28.0), d.y(162.0), d.fs(13.0), BLACK);
+    text(
+        &font,
+        "РАЗМЕР ПОЛЯ",
+        d.x(28.0),
+        d.y(162.0),
+        d.fs(13.0),
+        BLACK,
+    );
     field_row(app, &d, "Ширина (10–200)", 174.0, Edit::Width, mx, my);
     field_row(app, &d, "Высота (10–100)", 224.0, Edit::Height, mx, my);
     if app.preset == Preset::Custom {
-        field_row(app, &d, "Мины (1 … площадь − 1)", 274.0, Edit::Mines, mx, my);
+        field_row(
+            app,
+            &d,
+            "Мины (1 … площадь − 1)",
+            274.0,
+            Edit::Mines,
+            mx,
+            my,
+        );
     } else {
         let mines = app.preset.fixed_mines().unwrap_or(app.custom_mines);
         text(
@@ -897,7 +972,14 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
             dark,
         );
     }
-    text(&font, "КЛАВИШИ УПРАВЛЕНИЯ", d.x(28.0), d.y(340.0), d.fs(13.0), BLACK);
+    text(
+        &font,
+        "КЛАВИШИ УПРАВЛЕНИЯ",
+        d.x(28.0),
+        d.y(340.0),
+        d.fs(13.0),
+        BLACK,
+    );
     let rows = [
         ("Флаг", Edit::KeyFlag, app.key_flag),
         ("Открыть клетку", Edit::KeyOpen, app.key_open),
@@ -914,7 +996,14 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
         } else {
             key_label(*key)
         };
-        centered(&font, &label, xx + bw / 2.0, d.y(yy) + d.w(19.0), d.fs(11.0), BLACK);
+        centered(
+            &font,
+            &label,
+            xx + bw / 2.0,
+            d.y(yy) + d.w(19.0),
+            d.fs(11.0),
+            BLACK,
+        );
         if is_mouse_button_pressed(MouseButton::Left) && hit(mx, my, xx, d.y(yy), bw, bh) {
             app.edit = Some(*edit);
             app.edit_buffer.clear();
@@ -934,7 +1023,14 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
     let bw = d.w(104.0);
     let bh = d.w(29.0);
     bevel(bx, by, bw, bh, false);
-    centered(&font, "Готово", bx + bw / 2.0, by + d.w(20.0), d.fs(13.0), BLACK);
+    centered(
+        &font,
+        "Готово",
+        bx + bw / 2.0,
+        by + d.w(20.0),
+        d.fs(13.0),
+        BLACK,
+    );
     if is_mouse_button_pressed(MouseButton::Left) && hit(mx, my, bx, by, bw, bh) {
         app.settings = false;
         app.close_edit();
@@ -970,17 +1066,16 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
     app.close_edit();
 }
 
-fn field_row(
-    app: &mut App,
-    d: &Dialog,
-    label: &str,
-    row_y: f32,
-    edit: Edit,
-    mx: f32,
-    my: f32,
-) {
+fn field_row(app: &mut App, d: &Dialog, label: &str, row_y: f32, edit: Edit, mx: f32, my: f32) {
     let font = app.font.clone();
-    text(&font, label, d.x(28.0), d.y(row_y + 21.0), d.fs(12.0), BLACK);
+    text(
+        &font,
+        label,
+        d.x(28.0),
+        d.y(row_y + 21.0),
+        d.fs(12.0),
+        BLACK,
+    );
     let right = d.x(Dialog::W - 174.0);
     let field_w = d.w(72.0);
     let field_h = d.w(30.0);
@@ -996,18 +1091,33 @@ fn field_row(
     } else {
         value.to_string()
     };
-    centered(&font, &shown, right + field_w / 2.0, d.y(row_y) + d.w(20.0), d.fs(14.0), BLACK);
+    centered(
+        &font,
+        &shown,
+        right + field_w / 2.0,
+        d.y(row_y) + d.w(20.0),
+        d.fs(14.0),
+        BLACK,
+    );
     for (i, (label, delta)) in [("−", -1isize), ("+", 1isize)].iter().enumerate() {
         let xx = right + field_w + d.w(7.0) + i as f32 * d.w(34.0);
         let bw = d.w(29.0);
         bevel(xx, d.y(row_y), bw, field_h, false);
-        centered(&font, *label, xx + bw / 2.0, d.y(row_y) + d.w(21.0), d.fs(17.0), BLACK);
+        centered(
+            &font,
+            *label,
+            xx + bw / 2.0,
+            d.y(row_y) + d.w(21.0),
+            d.fs(17.0),
+            BLACK,
+        );
         if is_mouse_button_pressed(MouseButton::Left) && hit(mx, my, xx, d.y(row_y), bw, field_h) {
             app.close_edit();
             change_value(app, edit, *delta);
         }
     }
-    if is_mouse_button_pressed(MouseButton::Left) && hit(mx, my, right, d.y(row_y), field_w, field_h)
+    if is_mouse_button_pressed(MouseButton::Left)
+        && hit(mx, my, right, d.y(row_y), field_w, field_h)
     {
         app.edit = Some(edit);
         app.edit_buffer.clear();

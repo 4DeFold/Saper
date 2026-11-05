@@ -316,10 +316,7 @@ impl Game {
 
     /// Классический «аккорд»: ЛКМ по открытой цифре при нужном числе флагов.
     pub fn chord(&mut self, x: usize, y: usize) -> Event {
-        if self.phase != Phase::Playing
-            || x >= self.config.width
-            || y >= self.config.height
-        {
+        if self.phase != Phase::Playing || x >= self.config.width || y >= self.config.height {
             return Event::None;
         }
         let i = self.idx(x, y);
@@ -413,7 +410,10 @@ impl Game {
             }
             for (nx, ny) in self.neighbors(cx, cy) {
                 let ni = self.idx(nx, ny);
-                if !queued[ni] && !self.cells[ni].open && !self.cells[ni].flag && !self.cells[ni].mine
+                if !queued[ni]
+                    && !self.cells[ni].open
+                    && !self.cells[ni].flag
+                    && !self.cells[ni].mine
                 {
                     queued[ni] = true;
                     queue.push_back((nx, ny));
@@ -458,14 +458,24 @@ mod tests {
 
     #[test]
     fn config_limits_width_height_and_mines() {
-        assert_eq!(Config::new(0, 0, 0), Config { width: 10, height: 10, mines: 1 });
+        assert_eq!(
+            Config::new(0, 0, 0),
+            Config {
+                width: 10,
+                height: 10,
+                mines: 1
+            }
+        );
         assert_eq!(Config::new(5, 5, 0).width, MIN_WIDTH);
         assert_eq!(Config::new(5, 5, 0).height, MIN_HEIGHT);
         assert_eq!(Config::new(5, 5, 0).mines, 1);
         assert_eq!(Config::new(999, 999, 999).width, MAX_WIDTH);
         assert_eq!(Config::new(999, 999, 999).height, MAX_HEIGHT);
         assert_eq!(Config::max_mines(MAX_WIDTH, MAX_HEIGHT), MAX_MINES);
-        assert_eq!(Config::new(MAX_WIDTH, MAX_HEIGHT, usize::MAX).mines, MAX_MINES);
+        assert_eq!(
+            Config::new(MAX_WIDTH, MAX_HEIGHT, usize::MAX).mines,
+            MAX_MINES
+        );
         assert_eq!(Config::new(10, 10, 100).mines, 99);
         assert_eq!(Config::new(200, 100, 20_000).mines, 19_999);
         assert_eq!(Config::new(30, 16, 479).mines, 479);
@@ -515,7 +525,12 @@ mod tests {
 
     #[test]
     fn max_density_never_hangs_and_wins_immediately() {
-        let cases = [(10, 10, 99), (10, 100, 999), (50, 50, 2499), (200, 100, 19_999)];
+        let cases = [
+            (10, 10, 99),
+            (10, 100, 999),
+            (50, 50, 2499),
+            (200, 100, 19_999),
+        ];
         for (width, height, mines) in cases {
             let config = Config::new(width, height, mines);
             assert_eq!(config.mines, mines);
@@ -540,7 +555,10 @@ mod tests {
         assert_eq!(event, Event::Open);
         assert_eq!(game.phase(), Phase::Playing);
         let opened = game.cells().iter().filter(|c| c.open).count();
-        assert!(opened >= 9, "должна открыться область, а не одна клетка: {opened}");
+        assert!(
+            opened >= 9,
+            "должна открыться область, а не одна клетка: {opened}"
+        );
         assert!(!game.cell(4, 4).mine);
         assert_eq!(game.cell(4, 4).around, 0);
         for y in 0..game.height() {
@@ -576,7 +594,11 @@ mod tests {
         assert_eq!(game.flags(), 0);
         assert_eq!(game.toggle_flag(999, 999), Event::None);
         game.open(5, 5);
-        assert_eq!(game.toggle_flag(5, 5), Event::None, "открытую клетку нельзя флаговать");
+        assert_eq!(
+            game.toggle_flag(5, 5),
+            Event::None,
+            "открытую клетку нельзя флаговать"
+        );
     }
 
     #[test]
@@ -594,7 +616,11 @@ mod tests {
         }
         assert_eq!(game.phase(), Phase::Won);
         assert_eq!(game.mine_counter(), 0);
-        assert_eq!(game.open(0, 0), Event::None, "после победы ввод игнорируется");
+        assert_eq!(
+            game.open(0, 0),
+            Event::None,
+            "после победы ввод игнорируется"
+        );
     }
 
     #[test]
@@ -626,7 +652,10 @@ mod tests {
                 let cell = game.cell(x, y);
                 cell.open
                     && cell.around > 0
-                    && game.neighbors(x, y).iter().any(|&(nx, ny)| !game.cell(nx, ny).open)
+                    && game
+                        .neighbors(x, y)
+                        .iter()
+                        .any(|&(nx, ny)| !game.cell(nx, ny).open)
             })
             .expect("нужна открытая цифра с закрытыми соседями");
         let (x, y) = target;
@@ -636,7 +665,11 @@ mod tests {
             .filter(|&&(nx, ny)| !game.cell(nx, ny).open && !game.cell(nx, ny).flag)
             .count();
         assert!(closed_before > 0);
-        assert_eq!(game.chord(x, y), Event::None, "без флагов аккорд не срабатывает");
+        assert_eq!(
+            game.chord(x, y),
+            Event::None,
+            "без флагов аккорд не срабатывает"
+        );
         for (nx, ny) in game.neighbors(x, y) {
             if game.cell(nx, ny).mine && !game.cell(nx, ny).open {
                 game.toggle_flag(nx, ny);
@@ -649,7 +682,10 @@ mod tests {
             .iter()
             .filter(|&&(nx, ny)| !game.cell(nx, ny).open && !game.cell(nx, ny).flag)
             .count();
-        assert!(closed_after < closed_before, "аккорд должен открыть соседей");
+        assert!(
+            closed_after < closed_before,
+            "аккорд должен открыть соседей"
+        );
     }
 
     #[test]
