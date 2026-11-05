@@ -126,7 +126,7 @@ jobs:
           }
           echo "==> .app запущен через LaunchServices, ресурсы и логика проверены" >> ci-macos-report.txt
 
-      - name: Попытка GUI smoke (информативно: headless-раннер без OpenGL)
+      - name: "Попытка GUI smoke (информативно, headless-раннер без OpenGL)"
         continue-on-error: true
         run: |
           set -uo pipefail
