@@ -341,7 +341,7 @@ fn frame(app: &mut App) {
     let sw = screen_width();
     let sh = screen_height();
     let (mx, my) = mouse_position();
-    let layout = compute_layout(app, sw, sh);
+    let layout = compute_layout(app.zoom, app.game.width(), sw, sh);
 
     draw_panel(sw, sh, layout.panel_x, layout.panel_w);
     draw_header(app, &layout);
@@ -371,22 +371,24 @@ fn frame(app: &mut App) {
         app.dragging = false;
     }
 
-    let updated = compute_layout(app, sw, sh);
+    let updated = compute_layout(app.zoom, app.game.width(), sw, sh);
     clamp_cam(app, &updated);
 }
 
-fn compute_layout(app: &App, sw: f32, sh: f32) -> Layout {
+fn compute_layout(zoom: f32, cols: usize, sw: f32, sh: f32) -> Layout {
     let margin = 16.0;
     let panel_w = (sw - 2.0 * margin).clamp(160.0, 980.0).min(sw);
     let panel_x = (sw - panel_w) / 2.0;
-    let cell = (28.0 * app.zoom).clamp(CELL_MIN, CELL_MAX);
+    let cell = (28.0 * zoom).clamp(CELL_MIN, CELL_MAX);
     let header_y = 18.0;
     let toolbar_y = 96.0;
     let toolbar_h = 30.0;
-    let board_y = toolbar_y + toolbar_h + 22.0;
-    let board_h = (sh - board_y - 52.0).max(60.0);
+    let board_y = (toolbar_y + toolbar_h + 22.0).min((sh - 80.0).max(40.0));
+    let wanted_h = (sh - board_y - 52.0).max(60.0);
+    let available_h = (sh - board_y - 8.0).max(20.0);
+    let board_h = wanted_h.min(available_h);
     let board_w = (panel_w - 40.0)
-        .min(app.game.width() as f32 * cell)
+        .min(cols.max(1) as f32 * cell)
         .max(60.0)
         .min(sw - 16.0);
     let board_x = (sw - board_w) / 2.0;
@@ -1079,9 +1081,11 @@ fn draw_settings(app: &mut App, sw: f32, sh: f32, mx: f32, my: f32) {
         if is_mouse_button_pressed(MouseButton::Left) && hit(mx, my, xx, yy, pw, hh) {
             app.preset = *preset;
             app.close_edit();
-            let (width, height) = preset_size(*preset);
-            app.width = width;
-            app.height = height;
+            if *preset != Preset::Custom {
+                let (width, height) = preset_size(*preset);
+                app.width = width;
+                app.height = height;
+            }
             app.apply_board();
         }
     }
@@ -1311,4 +1315,40 @@ fn set_value(app: &mut App, edit: Edit, value: usize) {
         .custom_mines
         .clamp(1, Config::max_mines(app.width, app.height).min(MAX_MINES));
     app.apply_board();
+}
+
+#[cfg(test)]
+mod layout_tests {
+    use super::{compute_layout, CELL_MAX, CELL_MIN};
+
+    #[test]
+    fn centered_panel_and_board_fit_small_and_large_windows() {
+        let sizes = [(360.0, 240.0), (640.0, 400.0), (1120.0, 780.0), (1920.0, 1080.0)];
+        for (sw, sh) in sizes {
+            let l = compute_layout(1.0, 10, sw, sh);
+            assert!(l.panel_x >= 0.0);
+            assert!(l.panel_x + l.panel_w <= sw + 0.001);
+            assert!((l.panel_x - (sw - l.panel_w) / 2.0).abs() < 0.001);
+            assert!(l.board_x >= 0.0);
+            assert!(l.board_x + l.board_w <= sw + 0.001);
+            assert!((l.board_x - (sw - l.board_w) / 2.0).abs() < 0.001);
+            assert!(l.board_y >= 0.0);
+            assert!(l.board_y + l.board_h <= sh + 0.001);
+            assert!(l.status_y <= sh);
+            assert!((CELL_MIN..=CELL_MAX).contains(&l.cell));
+        }
+    }
+
+    #[test]
+    fn large_board_keeps_bounded_viewport_and_needs_panning() {
+        let zoomed_out = compute_layout(0.5, 200, 1120.0, 780.0);
+        let zoomed_in = compute_layout(1.6, 200, 1120.0, 780.0);
+        assert!(zoomed_in.cell > zoomed_out.cell);
+        assert!(zoomed_in.board_w <= 1120.0);
+        assert!(200.0 * zoomed_in.cell > zoomed_in.board_w);
+        assert!(100.0 * zoomed_in.cell > zoomed_in.board_h);
+        let tiny = compute_layout(1.0, 200, 360.0, 240.0);
+        assert!(tiny.board_w <= 360.0);
+        assert!(tiny.board_h <= 240.0);
+    }
 }
