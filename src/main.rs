@@ -158,25 +158,105 @@ impl Dialog {
 
 struct Smoke {
     frames: u32,
+    headless: bool,
     marker: Option<String>,
 }
 
-fn smoke_options() -> Option<Smoke> {
-    let mut frames = None;
-    let mut marker = None;
+fn smoke_options() -> Smoke {
+    let mut smoke = Smoke {
+        frames: 0,
+        headless: false,
+        marker: None,
+    };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--smoke" => frames = args.next().and_then(|v| v.parse::<u32>().ok()),
-            "--marker" => marker = args.next(),
+            "--smoke" => smoke.frames = args.next().and_then(|v| v.parse::<u32>().ok()).unwrap_or(0),
+            "--headless" => smoke.headless = true,
+            "--marker" => smoke.marker = args.next(),
             _ => {}
         }
     }
-    frames.map(|frames| Smoke { frames, marker })
+    smoke
 }
 
-#[macroquad::main(window_conf)]
-async fn main() {
+/// Проверка .app без OpenGL: исполняемый файл запущен LaunchServices из бандла,
+/// его ресурсы на месте, игровая логика работает. Используется в headless CI,
+/// где macOS-раннер не предоставляет GL-контекст для окна.
+fn run_headless(smoke: &Smoke) {
+    let exe = std::env::current_exe().unwrap_or_default();
+    let exe_display = exe.display();
+    let contents = exe.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf());
+    let mut lines = vec![format!("exe={exe_display}")];
+    let mut ok = true;
+    match &contents {
+        Some(dir) => {
+            let resources = dir.join("Resources");
+            let checks = [
+                dir.join("Info.plist"),
+                resources.join("FONT-LICENSE.txt"),
+                resources.join("DejaVuSans.ttf"),
+                resources.join("LICENSE.txt"),
+            ];
+            for path in &checks {
+                let found = path.is_file();
+                let shown = path.display();
+                lines.push(format!("resource {shown}: {found}"));
+                ok &= found;
+            }
+        }
+        None => {
+            lines.push("resource: не удалось определить Contents бандла".to_owned());
+            ok = false;
+        }
+    }
+    let font_len = FONT_BYTES.len();
+    let embedded = font_len > 100_000;
+    lines.push(format!("embedded font bytes: {font_len}"));
+    ok &= embedded;
+
+    let dense = Config::new(200, 100, 19_999);
+    let mut dense_game = Game::with_seed(dense, 7);
+    let dense_event = dense_game.open(100, 50);
+    let dense_ok = dense_event == Event::Win && dense_game.phase() == Phase::Won;
+    lines.push(format!("max density game: {dense_ok}"));
+    ok &= dense_ok;
+
+    let mut normal = Game::with_seed(Config::new(10, 10, 10), 11);
+    normal.toggle_flag(2, 2);
+    normal.toggle_flag(2, 2);
+    let normal_event = normal.open(4, 4);
+    let limits_ok = Config::new(5, 5, 0) == Config::new(10, 10, 1)
+        && Config::new(200, 100, 25_000).mines == 19_999;
+    let normal_ok = normal.flags() == 0
+        && normal.cell(4, 4).open
+        && normal_event == Event::Open
+        && limits_ok;
+    lines.push(format!("logic + limits: {normal_ok}"));
+    ok &= normal_ok;
+
+    let status = if ok { "HEADLESS OK" } else { "HEADLESS FAIL" };
+    let body = lines.join("\n");
+    let report = format!("{status}\n{body}\n");
+    if let Some(path) = &smoke.marker {
+        let _ = std::fs::write(path, report.as_bytes());
+    }
+    println!("{report}");
+    if !ok {
+        std::process::exit(1);
+    }
+}
+
+fn main() {
+    let smoke = smoke_options();
+    if smoke.headless {
+        run_headless(&smoke);
+        return;
+    }
+    macroquad::Window::from_config(window_conf(), amain(smoke));
+}
+
+async fn amain(smoke: Smoke) {
     let font = load_ttf_font_from_bytes(FONT_BYTES)
         .expect("не удалось загрузить встроенный шрифт DejaVu Sans");
     let sounds = [
@@ -191,12 +271,11 @@ async fn main() {
             .expect("не удалось создать звук победы"),
     ];
     let mut app = App::new(font, sounds);
-    let smoke = smoke_options();
     let mut drawn = 0u32;
     loop {
         clear_background(Color::new(0.72, 0.72, 0.72, 1.0));
         frame(&mut app);
-        if let Some(smoke) = &smoke {
+        if smoke.frames > 0 {
             drawn += 1;
             if drawn >= smoke.frames {
                 let message = format!("SMOKE OK: frames={drawn}\n");
