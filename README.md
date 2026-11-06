@@ -10,6 +10,11 @@
 синтезируются в виде PCM WAV на лету. Для кириллицы в бинарь встроен
 DejaVu Sans, лицензия которого лежит отдельно (см. ниже).
 
+#Get Started
+
+  https://github.com/4DeFold/Saper/releases/tag/v0.1.0 - релиз
+  Скачать игру (.dmg) -> https://github.com/4DeFold/Saper/releases/download/v0.1.0/Classic-Minesweeper-Apple-Silicon.dmg
+
 ## Возможности
 
 - Пресеты «Новичок» (10 мин), «Любитель» (40), «Профессионал» (99) и
