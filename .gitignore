@@ -1,0 +1,19 @@
+# Cargo
+/target/
+**/target/
+
+# Локальные артефакты сборки macOS
+/build/
+/dist/
+
+# Отчёты CI и временные файлы
+ci-report.txt
+ci-macos-report.txt
+fmt.patch
+*.log
+*.swp
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
